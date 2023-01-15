@@ -69,26 +69,27 @@
 // static const u1_t PROGMEM APPEUI[8]={ 0x45, 0xB6, 0x01, 0xD0, 0x7E, 0xD5, 0xB3, 0x70};
 // static const u1_t PROGMEM APPEUI[8]= { 0x98, 0x7A, 0x01, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
 // ATTENTION the oder in bytes must be reversed defined (last byte form TTN is the first byte here)
-static const u1_t PROGMEM APPEUI[8]= { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  //hs002
-
+// this is for ttgo t-beam 1 device
+//static const u1_t PROGMEM APPEUI[8]= { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };  //hs002
+// this is for ttgo t-beam 2 device
+static const u1_t PROGMEM APPEUI[8]= { 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01 };  //hs002
 
 void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
 
 // This should also be in little endian format, see above.
-//static const u1_t PROGMEM DEVEUI[8]={ 0x00, 0x02, 0x25, 0xB0, 0x03, 0xCC, 0x10, 0x03 };
-// static const u1_t PROGMEM DEVEUI[8]= { 0xE8, 0x7C, 0x19, 0xC3, 0x00, 0xC0, 0xD0, 0x00 };
 // ATTENTION the oder in bytes must be reversed defined (last byte form TTN is the first byte here)
-static const u1_t PROGMEM DEVEUI[8]= {0x36, 0xED, 0x04, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 }; // hs002
-// dhbw-test 70B3D57ED004D5F2
+
+ // this is for ttgo t-beam 1 device
+static const u1_t PROGMEM DEVEUI[8]= {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // hs002
+
 void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 
 // This key should be in big endian format (or, since it is not really a
 // number but a block of memory, endianness does not really apply). In
 // practice, a key taken from ttnctl can be copied as-is.
-//static const u1_t PROGMEM APPKEY[16] = { 0x16, 0x77, 0xD0, 0x1A, 0xEB, 0x57, 0xE5, 0x28, 0x84, 0x23, 0x19, 0x12, 0x70, 0xEC, 0xEF, 0xF0 };
-//static const u1_t PROGMEM APPKEY[16] = { 0x6F, 0xA9, 0x57, 0x78, 0xF0, 0x9E, 0xC1, 0xC5, 0xB6, 0xAF, 0x88, 0x74, 0x35, 0x58, 0xF1, 0x87 };
-static const u1_t PROGMEM APPKEY[16] = { 0xE9, 0xB4, 0x1C, 0xAC, 0x1C, 0xCB, 0xA2, 0x7F, 0x69, 0xCE, 0xE1, 0xC6, 0xF5, 0xE8, 0x9F, 0xCC};
-//dhbw-test C0 33 55 5D 9F FE C8 CC 43 0C 4C 36 EB BC 0F D5
+
+// this is for ttgo t-beam 2 device
+static const u1_t PROGMEM APPKEY[16] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
 
@@ -113,8 +114,8 @@ static uint8_t * __rxSz;
 
 
 void onEvent (ev_t ev) {
-    Serial.print(os_getTime());
-    Serial.print(": ");
+    //Serial.print(os_getTime());
+    //Serial.print(": ");
     switch(ev) {
         case EV_SCAN_TIMEOUT:
             Serial.println(F("EV_SCAN_TIMEOUT"));
@@ -178,11 +179,11 @@ void onEvent (ev_t ev) {
             txStatus = TX_STATUS_ENDING_ERROR;
             break;
         case EV_REJOIN_FAILED:
-            Serial.println(F("EV_REJOIN_FAILED"));
+            //Serial.println(F("EV_REJOIN_FAILED"));
             txStatus = TX_STATUS_ENDING_ERROR;
             break;
         case EV_TXCOMPLETE:
-            Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
+            //Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
             txStatus =   TX_STATUS_UPLINK_SUCCESS;
             if (LMIC.txrxFlags & TXRX_ACK) {
               txStatus = TX_STATUS_UPLINK_ACKED;
@@ -230,7 +231,7 @@ void onEvent (ev_t ev) {
         ||    break;
         */
         case EV_TXSTART:
-            Serial.println(F("EV_TXSTART"));
+            //Serial.println(F("EV_TXSTART"));
             txStatus = TX_STATUS_UNKNOWN;
             break;
         default:
