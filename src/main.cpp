@@ -36,15 +36,20 @@
 char          ssid[30];
 
 // T-Beam specific hardware
-#define BUILTIN_LED 21
+// #define BUILTIN_LED 21
 
 // this is my ttgo t-beam board
 #define SERIAL1_RX 12  // GPS_RX -> 12
 #define SERIAL1_TX 15  // GPS_TX -> 15
 String read_sentence;
 
+int Nmea = 0; // indicator which data from gps module will be sent - 0 means invalid data
+float latitude = 0;
+float longitude = 0;
+float altitude=0;
+int satalites = 0;
 // buffer to send to ttn
-uint8_t tx_payload[11];
+uint8_t tx_payload[12];
 
 double lat, lon, alt, kmph; // GPS data are saved here: Latitude, Longitude, Altitude, Speed in km/h
 float tmp, hum, pressure, alt_barometric; // BME280 data are saved here: Temperature, Humidity, Pressure, Altitude calculated from atmospheric pressure
@@ -86,9 +91,9 @@ unsigned long getESPchipID() {
 // send data to TTN
 // the formatted GPS Data are 11 bytes 
 void sendData2TTN(int sendwhat,  uint8_t * ttndata) {
-  Serial.println("sendData2TTN");
+  //Serial.println("sendData2TTN");
   int cnt;
-  cnt = 11;
+  cnt = 12;
   lorawan_send(1,ttndata,cnt,false,NULL,NULL,NULL);
 }
 String sentence_sep(String input, int index) {
@@ -123,11 +128,11 @@ float convert_gps_coord(float deg_min, String orientation) {
 //
 // generate the payload to be sent
 //
-void generate_payload(double lat, double lon, int alt, int sat) {
+void generate_payload(double lat, double lon, int alt, int sat, int nmea) {
   uint32_t LatitudeBinary = ((lat + 90) * 1000000);
   uint32_t LongitudeBinary = ((lon + 180) * 1000000);
 
-  uint8_t payload[11];
+  uint8_t payload[12];
 
   payload[0] = ( LatitudeBinary >> 24 ) & 0xFF;
   payload[1] = ( LatitudeBinary >> 16 ) & 0xFF;
@@ -143,6 +148,8 @@ void generate_payload(double lat, double lon, int alt, int sat) {
   payload[9] = alt & 0xFF;
 
   payload[10] = sat & 0xFF;
+
+  payload[11] = nmea & 0xFF; // indicator which gps (nema data send, 1=GPGAA, 2= GPRMC)
   
   int i = 0;
   while (i < sizeof(payload)) {
@@ -177,12 +184,12 @@ void setup()
 
 void loop()
 {
-
-
    // read the serial data from GPS Module
   read_sentence = Serial1.readStringUntil(13); //13 = return (ASCII)
   read_sentence.trim();
-
+  Serial.print("read-sentence: ");
+  Serial.println(read_sentence);
+  
   if (read_sentence.startsWith("$GPGGA")) {
     String gps_lat = sentence_sep(read_sentence, 2); //Latitude in degrees & minutes
     String gps_lon = sentence_sep(read_sentence, 4); //Longitude in degrees & minutes
@@ -190,45 +197,82 @@ void loop()
     String gps_hgt = sentence_sep(read_sentence, 9);
     String gps_lat_o = sentence_sep(read_sentence, 3); //Orientation (N or S)
     String gps_lon_o = sentence_sep(read_sentence, 5); //Orientation (E or W
+    if (((gps_lat_o == "N") | (gps_lat_o == "S")) & ((gps_lon_o == "E") | gps_lon_o == "W")) {
 
+      Nmea = 1; // we received valid data from gps module
+   
     // print the data on debugging monitor
-    Serial.print("LAT: ");
-    Serial.print(gps_lat);
-    Serial.print(" LON: ");
-    Serial.print(gps_lon);
-    Serial.print(" HEIGHT: ");
-    Serial.print(gps_hgt);
-    Serial.print(" SAT: ");
-    Serial.println(gps_sat);
-
+      //Serial.print("$GPGGA detected and valid :");
+      //Serial.print("LAT: ");
+      //Serial.print(gps_lat);
+      //Serial.print(" LON: ");
+      //Serial.print(gps_lon);
+      //Serial.print(" HEIGHT: ");
+      //Serial.print(gps_hgt);
+      //Serial.print(" SAT: ");
+      //Serial.println(gps_sat);
+      latitude = convert_gps_coord(gps_lat.toFloat(), gps_lat_o);
+      longitude = convert_gps_coord(gps_lon.toFloat(), gps_lon_o);
+      altitude = gps_hgt.toFloat();
+      satalites = gps_sat.toInt();
+      //Serial.print("GPGGA convertion :");
+      //Serial.print("latitude = ");
+      //Serial.print(latitude,8);
+      //Serial.print("  longitude = ");
+      //Serial.print(longitude,8);
+      //Serial.print("  altitude = ");
+      //Serial.print(altitude);
+      //Serial.print("  satalites = ");
+      //Serial.println(satalites);
+    }
+    
   } else {
     // in the real app - just send data only GPS is available
     // no gps signal - for test purpose send dummy values
+    /*
     gps_lat = "4840.74971";
     gps_lon = "00854.16609";
     gps_sat = "05";
     gps_hgt = "453.2";
     gps_lat_o = "N";
     gps_lon_o = "E";
-
-    Serial.print("LAT dummy: ");
-    Serial.print(gps_lat);
-    Serial.print(" LON dummy: ");
-    Serial.print(gps_lon);
-    Serial.print(" HEIGHT dummy: ");
-    Serial.print(gps_hgt);
-    Serial.print(" SAT dummy: ");
-    Serial.println(gps_sat);
+    */
+    Nmea = 0;
   }
-  float Latitude = convert_gps_coord(gps_lat.toFloat(), gps_lat_o);
-  float Longitude = convert_gps_coord(gps_lon.toFloat(), gps_lon_o);
-  float Altitude = gps_hgt.toFloat();
-  int Sat = gps_sat.toInt();
-  generate_payload(Latitude, Longitude, Altitude, Sat);
 
-  Serial.println("Sending to TTN ...");
+  if (read_sentence.indexOf("$GPRMC") >= 0) {
+    String gprmc_string = read_sentence.substring(read_sentence.indexOf("$GPRMC"));
+    //Serial.print("gprmc_string = ");
+    //Serial.print(gprmc_string);
+
+    String val_str = sentence_sep(read_sentence, 2);
+    String ns_id_str = sentence_sep(read_sentence, 4); // North / South id
+    String ew_id_str = sentence_sep(read_sentence, 6);  // East West id 
+    if ((val_str == "A") & ((ns_id_str == "N") | (ns_id_str == "S")) & ((ew_id_str == "E") | ew_id_str == "W")) {
+      Nmea = 2;
+      String gprmc_gps_lat = sentence_sep(read_sentence, 3); //Longitude in degrees & minutes
+      String gprmc_gps_lon = sentence_sep(read_sentence, 5);
+      Serial.println();
+      Serial.println(gprmc_gps_lat);
+      Serial.println(gprmc_gps_lon);
+      latitude = convert_gps_coord(gprmc_gps_lat.toFloat(), ns_id_str);
+      longitude = convert_gps_coord(gprmc_gps_lon.toFloat(), ew_id_str);
+      Serial.print("gprmc lat in dec = ");
+      Serial.println(latitude,8);
+      Serial.print("gprmc lon in dec = ");
+      Serial.println(longitude,8); 
+    }
+    else {
+      Nmea = 0;
+      // invalid GPRMC data 
+    }
+  } 
+  
+  generate_payload(latitude, longitude, altitude, satalites, Nmea);
+
+  //Serial.println("Sending to TTN ...");
     
   sendData2TTN(1,tx_payload);
-  delay(100);
+  delay(200);
 
 }
