@@ -34,6 +34,9 @@
 #include <U8x8lib.h>
 
 char          ssid[30];
+#define TTN_MESSAGING_INTERVAL  30// in seconds
+static unsigned long transmission_timestamp = millis(); 
+
 
 // T-Beam specific hardware
 // #define BUILTIN_LED 21
@@ -271,8 +274,12 @@ void loop()
   generate_payload(latitude, longitude, altitude, satalites, Nmea);
 
   //Serial.println("Sending to TTN ...");
-    
-  sendData2TTN(1,tx_payload);
-  delay(200);
+  if ((millis() - transmission_timestamp) >= (TTN_MESSAGING_INTERVAL * 1000)) {
+    //DisplayGMC(100,200,300,true,false);
+    transmission_timestamp=millis();
+   Serial.println("Sending to TTN ...");
+    sendData2TTN(1,tx_payload);
+    delay(200);
+  }
 
 }
